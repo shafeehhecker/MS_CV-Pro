@@ -12,14 +12,16 @@ A lightweight, self-hostable **ATS-optimised CV builder** with a live preview ed
 └──────────┬───────────────┬──────────────┘
            │ REST          │ static
 ┌──────────▼─────┐  ┌──────▼──────────────┐
-│ Express + ORM  │  │  Frontend (built)    │
+│ Express + ORM  │  │  Frontend (built)   │
 │ ATS Engine     │  └─────────────────────┘
 │ Puppeteer PDF  │
 └──────────┬─────┘
 ┌──────────▼─────┐
-│  PostgreSQL 15  │
+│  PostgreSQL 15 │
 └────────────────┘
 ```
+
+> MS CV Pro is a self-hostable, open-source CV builder designed for job seekers who want full control over their data and don't want to pay a monthly SaaS subscription to build a PDF document. Most CV builders either lock your data behind a paywall, require a cloud account, or produce ATS-unfriendly PDFs. Here, nothing leaves your server.
 
 ---
 
@@ -46,8 +48,8 @@ A lightweight, self-hostable **ATS-optimised CV builder** with a live preview ed
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/shafeehhecker/MS_CV-Pro
-cd mscvpro
+git clone https://github.com/shafeehhecker/MS_CV-Pro.git
+cd MS_CV-Pro
 
 cp .env.example .env
 # Edit .env — at minimum set DB_PASSWORD and JWT_SECRET
@@ -143,7 +145,7 @@ Prisma migrations run automatically on container start.
 ## Architecture
 
 ```
-mscvpro/
+MS_CV-Pro/
 ├── backend/
 │   ├── src/
 │   │   ├── index.js            # Express app entry
