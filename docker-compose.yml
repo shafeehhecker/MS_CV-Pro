@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: mscvpro_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mscvpro
+      POSTGRES_USER: mscvpro
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mscvpro_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mscvpro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mscvpro_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://mscvpro:${DB_PASSWORD:-mscvpro_secret}@db:5432/mscvpro
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-long-random-string}
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      NODE_ENV: ${NODE_ENV:-production}
+    volumes:
+      - uploads_data:/app/uploads
+      - exports_data:/app/exports
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: mscvpro_frontend
+    restart: unless-stopped
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:alpine
+    container_name: mscvpro_nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    depends_on:
+      - api
+      - frontend
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - exports_data:/var/exports:ro
+      - uploads_data:/var/uploads:ro
+    networks:
+      - internal
+      - external
+
+volumes:
+  postgres_data:
+  uploads_data:
+  exports_data:
+
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge
