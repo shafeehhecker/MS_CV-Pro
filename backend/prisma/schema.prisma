@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  cvs          CV[]
+}
+
+model CV {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String      @default("My CV")
+  templateId  String      @default("clean")
+  isPublic    Boolean     @default(false)
+  shareToken  String?     @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  personalInfo  PersonalInfo?
+  workExperiences WorkExperience[]
+  educations    Education[]
+  skills        Skill[]
+  projects      Project[]
+  certifications Certification[]
+  atsScores     AtsScore[]
+}
+
+model PersonalInfo {
+  id          String  @id @default(uuid())
+  cvId        String  @unique
+  cv          CV      @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  fullName    String  @default("")
+  email       String  @default("")
+  phone       String  @default("")
+  location    String  @default("")
+  title       String  @default("")
+  summary     String  @default("")
+  linkedin    String  @default("")
+  github      String  @default("")
+  website     String  @default("")
+  photoUrl    String  @default("")
+}
+
+model WorkExperience {
+  id          String  @id @default(uuid())
+  cvId        String
+  cv          CV      @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  company     String  @default("")
+  position    String  @default("")
+  location    String  @default("")
+  startDate   String  @default("")
+  endDate     String  @default("")
+  current     Boolean @default(false)
+  description String  @default("")
+  order       Int     @default(0)
+}
+
+model Education {
+  id          String  @id @default(uuid())
+  cvId        String
+  cv          CV      @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  institution String  @default("")
+  degree      String  @default("")
+  field       String  @default("")
+  startDate   String  @default("")
+  endDate     String  @default("")
+  gpa         String  @default("")
+  description String  @default("")
+  order       Int     @default(0)
+}
+
+model Skill {
+  id       String @id @default(uuid())
+  cvId     String
+  cv       CV     @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  name     String @default("")
+  level    String @default("intermediate")
+  category String @default("Technical")
+  order    Int    @default(0)
+}
+
+model Project {
+  id          String  @id @default(uuid())
+  cvId        String
+  cv          CV      @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  name        String  @default("")
+  description String  @default("")
+  url         String  @default("")
+  technologies String @default("")
+  startDate   String  @default("")
+  endDate     String  @default("")
+  order       Int     @default(0)
+}
+
+model Certification {
+  id        String  @id @default(uuid())
+  cvId      String
+  cv        CV      @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  name      String  @default("")
+  issuer    String  @default("")
+  date      String  @default("")
+  url       String  @default("")
+  order     Int     @default(0)
+}
+
+model AtsScore {
+  id            String   @id @default(uuid())
+  cvId          String
+  cv            CV       @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  jobTitle      String
+  jobDescription String
+  overallScore  Float
+  keywordScore  Float
+  sectionScore  Float
+  formatScore   Float
+  matchedKeywords String[]
+  missingKeywords String[]
+  suggestions   String[]
+  createdAt     DateTime @default(now())
+}
