@@ -46,7 +46,7 @@ A lightweight, self-hostable **ATS-optimised CV builder** with a live preview ed
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/yourname/mscvpro.git
+git clone https://github.com/shafeehhecker/MS_CV-Pro
 cd mscvpro
 
 cp .env.example .env
