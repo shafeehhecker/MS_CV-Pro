@@ -26,11 +26,19 @@ const useAuthStore = create((set) => ({
   },
 
   register: async (name, email, password) => {
+  try {
     const { data } = await api.post('/auth/register', { name, email, password })
+
     localStorage.setItem('token', data.token)
     set({ user: data.user, token: data.token })
+
     return data
-  },
+  } catch (error) {
+    console.error('Register failed:', error.response?.data || error.message)
+
+    throw error.response?.data || { message: 'Registration failed' }
+  }
+},
 
   logout: () => {
     localStorage.removeItem('token')
