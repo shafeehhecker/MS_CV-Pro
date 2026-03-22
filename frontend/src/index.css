@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-ink-50 text-ink-800 font-sans; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg
+           hover:bg-brand-700 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-white text-ink-700 text-sm font-medium rounded-lg
+           border border-ink-200 hover:bg-ink-50 active:scale-95 transition-all duration-150 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-2 text-ink-500 text-sm font-medium rounded-lg
+           hover:bg-ink-100 hover:text-ink-700 active:scale-95 transition-all duration-150;
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-lg
+           border border-red-200 hover:bg-red-100 active:scale-95 transition-all duration-150;
+  }
+  .input {
+    @apply w-full px-3 py-2 bg-white border border-ink-200 rounded-lg text-sm text-ink-800
+           placeholder:text-ink-300 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100
+           transition-all duration-150;
+  }
+  .textarea {
+    @apply w-full px-3 py-2 bg-white border border-ink-200 rounded-lg text-sm text-ink-800
+           placeholder:text-ink-300 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100
+           transition-all duration-150 resize-none;
+  }
+  .label {
+    @apply block text-xs font-medium text-ink-500 mb-1.5 uppercase tracking-wide;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-ink-100 shadow-sm;
+  }
+  .section-header {
+    @apply flex items-center justify-between px-5 py-3.5 border-b border-ink-100;
+  }
+  .score-ring {
+    @apply relative inline-flex items-center justify-center;
+  }
+}
+
+/* Score colors */
+.score-low { color: #ef4444; }
+.score-mid { color: #f59e0b; }
+.score-good { color: #10b981; }
+.score-bg-low { background: #fef2f2; border-color: #fecaca; }
+.score-bg-mid { background: #fffbeb; border-color: #fde68a; }
+.score-bg-good { background: #f0fdf4; border-color: #a7f3d0; }
+
+/* CV Preview print styles */
+@media print {
+  .no-print { display: none !important; }
+}
