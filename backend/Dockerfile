@@ -49,7 +49,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies (includes Puppeteer which downloads Chrome)
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Generate Prisma client
 RUN npx prisma generate
