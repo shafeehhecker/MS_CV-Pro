@@ -15,6 +15,36 @@ const CV_INCLUDE = {
   atsScores: { orderBy: { createdAt: 'desc' }, take: 5 }
 };
 
+// Field whitelists to prevent mass assignment
+function pickPersonalInfo(body) {
+  const allowed = ['fullName','email','phone','location','title','summary','linkedin','github','website','photoUrl'];
+  return Object.fromEntries(allowed.filter(k => k in body).map(k => [k, body[k]]));
+}
+function pickWork(body) {
+  const allowed = ['company','position','location','startDate','endDate','current','description','order'];
+  return Object.fromEntries(allowed.filter(k => k in body).map(k => [k, body[k]]));
+}
+function pickEducation(body) {
+  const allowed = ['institution','degree','field','startDate','endDate','gpa','description','order'];
+  return Object.fromEntries(allowed.filter(k => k in body).map(k => [k, body[k]]));
+}
+function pickSkill(body) {
+  const allowed = ['name','level','category','order'];
+  return Object.fromEntries(allowed.filter(k => k in body).map(k => [k, body[k]]));
+}
+function pickProject(body) {
+  const allowed = ['name','description','url','technologies','startDate','endDate','order'];
+  return Object.fromEntries(allowed.filter(k => k in body).map(k => [k, body[k]]));
+}
+function pickCertification(body) {
+  const allowed = ['name','issuer','date','url','order'];
+  return Object.fromEntries(allowed.filter(k => k in body).map(k => [k, body[k]]));
+}
+
+async function verifyCV(cvId, userId) {
+  return prisma.cV.findFirst({ where: { id: cvId, userId }, select: { id: true } });
+}
+
 // List all CVs for user
 router.get('/', auth, async (req, res) => {
   try {
@@ -39,7 +69,7 @@ router.get('/:id', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch CV' }); }
 });
 
-// Get public CV by share token
+// Get public CV by share token (no auth)
 router.get('/share/:token', async (req, res) => {
   try {
     const cv = await prisma.cV.findFirst({
@@ -106,18 +136,22 @@ router.patch('/:id', auth, async (req, res) => {
   try {
     const { title, templateId, isPublic } = req.body;
     const data = {};
-    if (title !== undefined) data.title = title;
-    if (templateId !== undefined) data.templateId = templateId;
+    if (title !== undefined) data.title = String(title).slice(0, 200);
+    if (templateId !== undefined) data.templateId = String(templateId).slice(0, 50);
     if (isPublic !== undefined) {
-      data.isPublic = isPublic;
-      if (isPublic) data.shareToken = uuidv4();
+      data.isPublic = Boolean(isPublic);
+      data.shareToken = isPublic ? uuidv4() : null;
     }
-    const cv = await prisma.cV.update({
-      where: { id: req.params.id },
-      data,
+    const cv = await prisma.cV.updateMany({
+      where: { id: req.params.id, userId: req.user.userId },
+      data
+    });
+    if (cv.count === 0) return res.status(404).json({ error: 'CV not found' });
+    const updated = await prisma.cV.findFirst({
+      where: { id: req.params.id, userId: req.user.userId },
       include: CV_INCLUDE
     });
-    res.json(cv);
+    res.json(updated);
   } catch (e) { res.status(500).json({ error: 'Failed to update CV' }); }
 });
 
@@ -132,10 +166,14 @@ router.delete('/:id', auth, async (req, res) => {
 // Update personal info
 router.put('/:id/personal', auth, async (req, res) => {
   try {
+    if (!await verifyCV(req.params.id, req.user.userId)) {
+      return res.status(404).json({ error: 'CV not found' });
+    }
+    const data = pickPersonalInfo(req.body);
     const pi = await prisma.personalInfo.upsert({
       where: { cvId: req.params.id },
-      update: req.body,
-      create: { cvId: req.params.id, ...req.body }
+      update: data,
+      create: { cvId: req.params.id, ...data }
     });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(pi);
@@ -145,21 +183,36 @@ router.put('/:id/personal', auth, async (req, res) => {
 // Work experience CRUD
 router.post('/:id/work', auth, async (req, res) => {
   try {
+    if (!await verifyCV(req.params.id, req.user.userId)) {
+      return res.status(404).json({ error: 'CV not found' });
+    }
     const count = await prisma.workExperience.count({ where: { cvId: req.params.id } });
-    const item = await prisma.workExperience.create({ data: { cvId: req.params.id, ...req.body, order: count } });
+    const item = await prisma.workExperience.create({
+      data: { cvId: req.params.id, ...pickWork(req.body), order: count }
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to add work experience' }); }
 });
 router.put('/:id/work/:itemId', auth, async (req, res) => {
   try {
-    const item = await prisma.workExperience.update({ where: { id: req.params.itemId }, data: req.body });
+    const existing = await prisma.workExperience.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    const item = await prisma.workExperience.update({
+      where: { id: req.params.itemId }, data: pickWork(req.body)
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to update' }); }
 });
 router.delete('/:id/work/:itemId', auth, async (req, res) => {
   try {
+    const existing = await prisma.workExperience.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
     await prisma.workExperience.delete({ where: { id: req.params.itemId } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed to delete' }); }
@@ -168,21 +221,36 @@ router.delete('/:id/work/:itemId', auth, async (req, res) => {
 // Education CRUD
 router.post('/:id/education', auth, async (req, res) => {
   try {
+    if (!await verifyCV(req.params.id, req.user.userId)) {
+      return res.status(404).json({ error: 'CV not found' });
+    }
     const count = await prisma.education.count({ where: { cvId: req.params.id } });
-    const item = await prisma.education.create({ data: { cvId: req.params.id, ...req.body, order: count } });
+    const item = await prisma.education.create({
+      data: { cvId: req.params.id, ...pickEducation(req.body), order: count }
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to add education' }); }
 });
 router.put('/:id/education/:itemId', auth, async (req, res) => {
   try {
-    const item = await prisma.education.update({ where: { id: req.params.itemId }, data: req.body });
+    const existing = await prisma.education.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    const item = await prisma.education.update({
+      where: { id: req.params.itemId }, data: pickEducation(req.body)
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to update' }); }
 });
 router.delete('/:id/education/:itemId', auth, async (req, res) => {
   try {
+    const existing = await prisma.education.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
     await prisma.education.delete({ where: { id: req.params.itemId } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed to delete' }); }
@@ -191,21 +259,36 @@ router.delete('/:id/education/:itemId', auth, async (req, res) => {
 // Skills CRUD
 router.post('/:id/skills', auth, async (req, res) => {
   try {
+    if (!await verifyCV(req.params.id, req.user.userId)) {
+      return res.status(404).json({ error: 'CV not found' });
+    }
     const count = await prisma.skill.count({ where: { cvId: req.params.id } });
-    const item = await prisma.skill.create({ data: { cvId: req.params.id, ...req.body, order: count } });
+    const item = await prisma.skill.create({
+      data: { cvId: req.params.id, ...pickSkill(req.body), order: count }
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to add skill' }); }
 });
 router.put('/:id/skills/:itemId', auth, async (req, res) => {
   try {
-    const item = await prisma.skill.update({ where: { id: req.params.itemId }, data: req.body });
+    const existing = await prisma.skill.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    const item = await prisma.skill.update({
+      where: { id: req.params.itemId }, data: pickSkill(req.body)
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to update' }); }
 });
 router.delete('/:id/skills/:itemId', auth, async (req, res) => {
   try {
+    const existing = await prisma.skill.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
     await prisma.skill.delete({ where: { id: req.params.itemId } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed to delete' }); }
@@ -214,21 +297,36 @@ router.delete('/:id/skills/:itemId', auth, async (req, res) => {
 // Projects CRUD
 router.post('/:id/projects', auth, async (req, res) => {
   try {
+    if (!await verifyCV(req.params.id, req.user.userId)) {
+      return res.status(404).json({ error: 'CV not found' });
+    }
     const count = await prisma.project.count({ where: { cvId: req.params.id } });
-    const item = await prisma.project.create({ data: { cvId: req.params.id, ...req.body, order: count } });
+    const item = await prisma.project.create({
+      data: { cvId: req.params.id, ...pickProject(req.body), order: count }
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to add project' }); }
 });
 router.put('/:id/projects/:itemId', auth, async (req, res) => {
   try {
-    const item = await prisma.project.update({ where: { id: req.params.itemId }, data: req.body });
+    const existing = await prisma.project.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    const item = await prisma.project.update({
+      where: { id: req.params.itemId }, data: pickProject(req.body)
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to update' }); }
 });
 router.delete('/:id/projects/:itemId', auth, async (req, res) => {
   try {
+    const existing = await prisma.project.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
     await prisma.project.delete({ where: { id: req.params.itemId } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed to delete' }); }
@@ -237,21 +335,36 @@ router.delete('/:id/projects/:itemId', auth, async (req, res) => {
 // Certifications CRUD
 router.post('/:id/certifications', auth, async (req, res) => {
   try {
+    if (!await verifyCV(req.params.id, req.user.userId)) {
+      return res.status(404).json({ error: 'CV not found' });
+    }
     const count = await prisma.certification.count({ where: { cvId: req.params.id } });
-    const item = await prisma.certification.create({ data: { cvId: req.params.id, ...req.body, order: count } });
+    const item = await prisma.certification.create({
+      data: { cvId: req.params.id, ...pickCertification(req.body), order: count }
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to add certification' }); }
 });
 router.put('/:id/certifications/:itemId', auth, async (req, res) => {
   try {
-    const item = await prisma.certification.update({ where: { id: req.params.itemId }, data: req.body });
+    const existing = await prisma.certification.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    const item = await prisma.certification.update({
+      where: { id: req.params.itemId }, data: pickCertification(req.body)
+    });
     await prisma.cV.update({ where: { id: req.params.id }, data: { updatedAt: new Date() } });
     res.json(item);
   } catch (e) { res.status(500).json({ error: 'Failed to update' }); }
 });
 router.delete('/:id/certifications/:itemId', auth, async (req, res) => {
   try {
+    const existing = await prisma.certification.findFirst({
+      where: { id: req.params.itemId, cv: { userId: req.user.userId } }
+    });
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
     await prisma.certification.delete({ where: { id: req.params.itemId } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed to delete' }); }

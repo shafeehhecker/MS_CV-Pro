@@ -5,6 +5,15 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret-change-in-production') {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: JWT_SECRET is not set or is using the insecure default in production.');
+    process.exit(1);
+  } else {
+    console.warn('WARNING: JWT_SECRET is using the insecure default. Set it in .env before deploying.');
+  }
+}
+
 const authRoutes = require('./routes/auth');
 const cvRoutes = require('./routes/cv');
 const atsRoutes = require('./routes/ats');
@@ -28,7 +37,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/exports', express.static(path.join(__dirname, '..', 'exports')));
 
-// Rate limiting
+// Stricter rate limit for auth endpoints (brute-force protection)
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many requests, please try again later' } });
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// General rate limit
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use('/api/', limiter);
 
@@ -39,7 +53,7 @@ app.use('/api/ats', atsRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/upload', uploadRoutes);
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.1.0' }));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

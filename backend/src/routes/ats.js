@@ -53,6 +53,12 @@ router.post('/score/:cvId', auth, async (req, res) => {
 
 router.get('/history/:cvId', auth, async (req, res) => {
   try {
+    const cv = await prisma.cV.findFirst({
+      where: { id: req.params.cvId, userId: req.user.userId },
+      select: { id: true }
+    });
+    if (!cv) return res.status(404).json({ error: 'CV not found' });
+
     const scores = await prisma.atsScore.findMany({
       where: { cvId: req.params.cvId },
       orderBy: { createdAt: 'desc' },
