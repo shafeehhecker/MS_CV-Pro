@@ -31,8 +31,11 @@ A lightweight, self-hostable **ATS-optimised CV builder** with a live preview ed
 |---------|-------------|
 | **CV Editor** | Section-based editor: Personal info, Work, Education, Skills, Projects, Certifications |
 | **Live Preview** | Real-time A4 preview as you type |
-| **ATS Scoring** | Local keyword analysis engine — no API keys needed |
-| **PDF Export** | Clean, ATS-safe PDF via Puppeteer headless Chrome |
+| **ATS Scoring** | Local keyword analysis with synonym clusters, stemming, and bigram matching — no API keys needed |
+| **PDF Export** | 4 templates (Clean, Modern, Minimal, Executive) via Puppeteer headless Chrome |
+| **DOCX Export** | ATS-friendly Word document export via the `docx` library |
+| **CV Templates** | Choose from `clean`, `modern`, `minimal`, or `executive` per CV |
+| **Shareable CVs** | Generate a public share link per CV (toggle on/off) |
 | **Multi-CV** | Unlimited CVs per user, with duplicate support |
 | **Auth** | JWT-based auth with bcrypt password hashing |
 | **Self-hosted** | Single `docker compose up` deployment |
@@ -155,11 +158,12 @@ MS_CV-Pro/
 │   │   │   ├── auth.js         # Register / login / me
 │   │   │   ├── cv.js           # Full CV CRUD + sections
 │   │   │   ├── ats.js          # ATS scoring endpoint
-│   │   │   ├── export.js       # PDF + HTML preview
+│   │   │   ├── export.js       # PDF + DOCX export + HTML preview
 │   │   │   └── upload.js       # Profile photo upload
 │   │   └── services/
-│   │       ├── atsEngine.js    # Local TF-IDF keyword engine
-│   │       └── pdfExport.js    # Puppeteer HTML→PDF
+│   │       ├── atsEngine.js    # Local keyword engine (synonyms + stemming)
+│   │       ├── pdfExport.js    # Puppeteer HTML→PDF (4 templates)
+│   │       └── docxExport.js   # Word document export
 │   └── prisma/
 │       ├── schema.prisma
 │       ├── seed.js
@@ -181,11 +185,12 @@ MS_CV-Pro/
 
 The scoring engine (`backend/src/services/atsEngine.js`) runs entirely locally:
 
-1. **Keyword extraction** — tokenises the job description using TF-IDF-inspired frequency weighting, extracting unigrams and bigrams after stop-word removal
-2. **Keyword matching** — checks which JD keywords appear in the CV text
-3. **Section scoring** — checks for presence of key sections (summary, quantified achievements, dates, contact info)
-4. **Format scoring** — flags ATS red flags (missing email/phone, too-sparse content, undated experience)
-5. **Scoring** — weighted composite: keywords 45%, sections 35%, format 20%
+1. **Keyword extraction** — tokenises the job description using frequency weighting, extracting unigrams and bigrams after stop-word removal
+2. **Synonym matching** — 30+ clusters map equivalent terms (e.g. `aws` ↔ `amazon web services`, `react` ↔ `reactjs`, `led` ↔ `managed` ↔ `directed`)
+3. **Stemming** — suffix stemmer handles inflections (`managing` → `manag`, `developed` → `develop`)
+4. **Section scoring** — checks for key sections (summary, quantified achievements, dates, contact info)
+5. **Format scoring** — flags ATS red flags (missing email/phone, too-sparse content, undated experience)
+6. **Scoring** — weighted composite: keywords 45%, sections 35%, format 20%
 
 No external API calls are made during scoring.
 
@@ -207,12 +212,13 @@ No external API calls are made during scoring.
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|-------|------------|
 | Frontend | React 18, Vite, Tailwind CSS, Zustand, React Router |
 | Backend | Node.js 20, Express 4, Prisma ORM |
 | Database | PostgreSQL 15 |
-| PDF | Puppeteer (headless Chrome) |
-| ATS Engine | Custom TF-IDF (no external APIs) |
+| PDF | Puppeteer (headless Chrome), 4 templates |
+| DOCX | `docx` npm library |
+| ATS Engine | Custom keyword engine with synonym clusters + stemmer (no external APIs) |
 | Proxy | Nginx |
 | Container | Docker Compose |
 
